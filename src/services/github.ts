@@ -12,17 +12,9 @@ const MAX_LANGUAGE_LOOKUPS = 15
 const MAX_LANGUAGES_SHOWN = 6
 const RECENT_REPOS_LIMIT = 6
 
-const raw = import.meta.env.VITE_GITHUB_TOKEN as string | undefined
-const token = raw && raw !== 'seu_token_aqui' ? raw : undefined
-
-/** Instância Axios configurada para a API REST pública do GitHub */
+/** Instância Axios configurada para o proxy serverless */
 export const githubApi = axios.create({
-  baseURL: 'https://api.github.com',
-  headers: {
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  },
+  baseURL: '/api/github',
   timeout: 12000,
 })
 
@@ -64,14 +56,14 @@ function toGithubApiError(error: unknown): GithubApiError {
 
 /** GET /users/{username} — dados do perfil */
 async function getUser(username: string): Promise<GithubUser> {
-  const { data } = await githubApi.get<GithubUser>(`/users/${username}`)
+  const { data } = await githubApi.get<GithubUser>('', { params: { path: `users/${username}` } })
   return data
 }
 
 /** GET /users/{username}/repos — até 100 repositórios ordenados por atualização */
 async function getUserRepositories(username: string): Promise<GithubRepo[]> {
-  const { data } = await githubApi.get<GithubRepo[]>(`/users/${username}/repos`, {
-    params: { sort: 'updated', per_page: 100 },
+  const { data } = await githubApi.get<GithubRepo[]>('', {
+    params: { path: `users/${username}/repos`, sort: 'updated', per_page: 100 },
   })
   return data
 }
@@ -85,7 +77,7 @@ async function aggregateLanguages(username: string, repos: GithubRepo[]): Promis
   const targets = repos.filter((repo) => !repo.fork).slice(0, MAX_LANGUAGE_LOOKUPS)
 
   const results = await Promise.allSettled(
-    targets.map((repo) => githubApi.get<LanguagesMap>(`/repos/${username}/${repo.name}/languages`)),
+    targets.map((repo) => githubApi.get<LanguagesMap>('', { params: { path: `repos/${username}/${repo.name}/languages` } })),
   )
 
   const aggregated: LanguagesMap = {}
